@@ -1,9 +1,17 @@
 #include <iostream>
-#include <dlfcn.h>
-using namespace std;
 
+#ifdef _WIN32
+#include <windows.h>
+#define dlsym GetProcAddress
+#define DYNAMIC_CUDA_PATH "nvcuda.dll"
+#define DYNAMIC_CUDART_PATH "cudart64_110.dll"
+#else
+#include <dlfcn.h>
 #define DYNAMIC_CUDA_PATH "/usr/lib/x86_64-linux-gnu/libcuda.so"
 #define DYNAMIC_CUDART_PATH "/usr/local/cuda/lib64/libcudart.so"
+#endif
+
+using namespace std;
 
 enum TINY_CUDA_CODES
 {
@@ -45,16 +53,20 @@ TINY_CUDA_CODES (*cudaGraphicsUnmapResources) (	int 	count, cudaGraphicsResource
 
 int main(int argc, char* argv[])
 {
-    const char* cuda_lib_path = DYNAMIC_CUDA_PATH;
-    void* cuda_lib = dlopen(cuda_lib_path, RTLD_NOW);
+#ifdef _WIN32
+    HMODULE cuda_lib = (HMODULE)LoadLibraryA(DYNAMIC_CUDA_PATH);
+    HMODULE cudart_lib = (HMODULE)LoadLibraryA(DYNAMIC_CUDART_PATH);
+#else
+    void* cuda_lib = dlopen(DYNAMIC_CUDA_PATH, RTLD_NOW);
+    void* cudart_lib = dlopen(DYNAMIC_CUDART_PATH, RTLD_NOW);
+    //could use dlerror() on error
+#endif
     if (!cuda_lib) {
-        cout << "Unable to load library " << cuda_lib_path << endl << dlerror() << endl;
+        cout << "Unable to load library " << DYNAMIC_CUDA_PATH << endl << endl;
         return false;
     }
-
-    void* cudart_lib = dlopen(DYNAMIC_CUDART_PATH, RTLD_NOW);
     if (!cudart_lib) {
-        cout << "Unable to load library " << DYNAMIC_CUDART_PATH << endl << dlerror() << endl;
+        cout << "Unable to load library " << DYNAMIC_CUDART_PATH << endl << endl;
         return false;
     }
 
@@ -79,8 +91,6 @@ int main(int argc, char* argv[])
     int device_count=0;
     result = cuDeviceGetCount(&device_count);
     cout << "CUDA device count:" << device_count << endl;
-
-
     result = cuGetProcAddress("cuDeviceGetCount", (void**)&cuDeviceGetCount2, cuda_driver_version, CU_GET_PROC_ADDRESS_DEFAULT);
     if (CUDA_SUCCESS != result)
     {
